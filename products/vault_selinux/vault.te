@@ -1,4 +1,4 @@
-policy_module(vault, #VERSION#)
+policy_module(vault, 0.1.7)
 
 ########################################
 #
@@ -47,7 +47,8 @@ require {
 	type vault_sys_content_t;
 	type vault_log_t;
 	type kernel_t; # Needed for /dev/log
-        type init_t; # Needed for systemD to read vault.env
+  type init_t; # Needed for systemD to read vault.env
+  type cgroup_t;
 	type unreserved_port_t;
 	class netlink_route_socket { bind create getattr nlmsg_read read write };
 	class tcp_socket { accept bind connect create getattr getopt listen setopt read write };
@@ -146,6 +147,7 @@ allow init_t vault_conf_t:file { read open };
 # Need to access data files
 allow vault_t vault_sys_content_t:dir { add_name create getattr open read write search remove_name };
 allow vault_t vault_sys_content_t:file { create getattr lock map open read write unlink rename };
+allow vault_t vault_sys_content_t:lnk_file { create getattr lock map open read write unlink rename };
 
 # Need to access log files
 allow vault_t vault_log_t:dir { getattr search write add_name };
@@ -154,6 +156,9 @@ allow vault_t vault_log_t:file { create append open setattr };
 # Needs this for logging
 logging_create_devlog_dev(vault_t)
 logging_send_syslog_msg(vault_t)
+
+# ! Seems like it wants to do this, not sure why
+allow vault_t cgroup_t:dir search;
 
 ## <desc>
 ## <p>
