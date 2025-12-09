@@ -12,18 +12,20 @@ restorecon -R -F -v -i /var/log/vault_audit.log; \
 semanage port -a -t vault_cluster_port_t -p tcp 8201; \
 
 Name:   vault_selinux
-Version:	#VERSION#
-Release:	1%{?dist}
-Summary:	SELinux policy module for vault
+Version:    0.1.7
+Release:    1%{?dist}
+Summary:    SELinux policy module for vault
 
-Group:	System Environment/Base		
-License:	MPLv2
-URL:		https://www.vaultproject.io/
-Source0:	vault.pp
-Source1:	vault.if
-Source2:	vault_selinux.8
+Group:    System Environment/Base
+License:    MPLv2
+URL:        https://www.vaultproject.io/
+Source0:    vault.fc
+Source1:    vault.if
+Source2:    vault.te
+Source3:    vault_selinux.8
 
 %if 0%{?el7}
+BuildRequires: selinux-policy-devel, policycoreutils-devel, setools-console
 Requires: policycoreutils, libselinux-utils
 Requires(post): selinux-policy-targeted, policycoreutils
 Requires(postun): policycoreutils
@@ -31,13 +33,23 @@ BuildArch: noarch
 %endif
 
 %if 0%{?el8}
-Requires: policycoreutils, libselinux-utils,policycoreutils-python-utils
+BuildRequires: selinux-policy-devel, policycoreutils-devel, setools-console
+Requires: policycoreutils, libselinux-utils, policycoreutils-python-utils
+Requires(post): selinux-policy-targeted, policycoreutils, policycoreutils-python-utils
+Requires(postun): policycoreutils
+BuildArch: noarch
+%endif
+
+%if 0%{?el9}
+BuildRequires: selinux-policy-devel, policycoreutils-devel, setools-console
+Requires: policycoreutils, libselinux-utils, policycoreutils-python-utils
 Requires(post): selinux-policy-targeted, policycoreutils, policycoreutils-python-utils
 Requires(postun): policycoreutils
 BuildArch: noarch
 %endif
 
 %if 0%{?fc31}
+BuildRequires: selinux-policy-devel, policycoreutils-devel, setools-console
 Requires: policycoreutils, libselinux-utils, policycoreutils-python-utils
 Requires(post): selinux-policy-targeted, policycoreutils, policycoreutils-python-utils
 Requires(postun): policycoreutils, policycoreutils-python-utils
@@ -45,6 +57,7 @@ BuildArch: noarch
 %endif
 
 %if 0%{?fc32}
+BuildRequires: selinux-policy-devel, policycoreutils-devel, setools-console
 Requires: policycoreutils, libselinux-utils, policycoreutils-python-utils
 Requires(post): selinux-policy-targeted, policycoreutils, policycoreutils-python-utils
 Requires(postun): policycoreutils, policycoreutils-python-utils
@@ -52,6 +65,7 @@ BuildArch: noarch
 %endif
 
 %if 0%{?fc33}
+BuildRequires: selinux-policy-devel, policycoreutils-devel, setools-console
 Requires: policycoreutils, libselinux-utils, policycoreutils-python-utils
 Requires(post): selinux-policy-targeted, policycoreutils, policycoreutils-python-utils
 Requires(postun): policycoreutils, policycoreutils-python-utils
@@ -61,13 +75,21 @@ BuildArch: noarch
 %description
 This package installs and sets up the  SELinux policy security module for vault.
 
+%prep
+cp %{SOURCE0} %{SOURCE1} %{SOURCE2} .
+cp $(rpm -ql selinux-policy-devel | grep -E 'policy.xml|file_contexts') .
+
+%build
+# Copied from sepolicy builder script
+make -f /usr/share/selinux/devel/Makefile vault.pp || exit
+
 %install
 install -d %{buildroot}%{_datadir}/selinux/packages
-install -m 644 %{SOURCE0} %{buildroot}%{_datadir}/selinux/packages
+install -m 644 vault.pp %{buildroot}%{_datadir}/selinux/packages
 install -d %{buildroot}%{_datadir}/selinux/devel/include/contrib
 install -m 644 %{SOURCE1} %{buildroot}%{_datadir}/selinux/devel/include/contrib/
 install -d %{buildroot}%{_mandir}/man8/
-install -m 644 %{SOURCE2} %{buildroot}%{_mandir}/man8/vault_selinux.8
+install -m 644 %{SOURCE3} %{buildroot}%{_mandir}/man8/vault_selinux.8
 install -d %{buildroot}/etc/selinux/targeted/contexts/users/
 
 
@@ -122,4 +144,3 @@ exit 0
 
 * Wed Aug 12 2020 Christian Frichot <cfrichot@hashicorp.com> 0.1.0-1
 - Initial version
-
