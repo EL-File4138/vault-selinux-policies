@@ -149,7 +149,7 @@ The SELinux process type vault_t can manage files labeled with the following fil
 .br
 .B vault_sys_content_t
 
-	/opt/vault(/.*)?
+	/opt/vault/data(/.*)?
 .br
 
 .SH FILE CONTEXTS
@@ -181,7 +181,7 @@ Note: SELinux often uses regular expressions to specify labels that match multip
 .B vault_conf_t
 .EE
 
-- Set files with the vault_conf_t type, if you want to treat the files as vault configuration data, usually stored under the /etc directory.
+- Set files with the vault_conf_t type for read-only configuration and TLS material: /etc/vault.d and /opt/vault/tls.
 
 
 .EX
@@ -202,14 +202,22 @@ Note: SELinux often uses regular expressions to specify labels that match multip
 .br
 .TP 5
 Paths:
-/var/log/vault(.*), /var/log/vault(/.*)?
+/var/log/vault(/.*)?, /var/log/vault_audit.log and its dotted rotations.
 
 .EX
 .PP
 .B vault_sys_content_t
 .EE
 
-- Set files with the vault_sys_content_t type, if you want to treat the files as vault sys content.
+- Set files with the vault_sys_content_t type for writable Vault storage under /opt/vault/data.
+.PP
+The /opt/vault parent directory uses vault_root_t and is read-only to Vault,
+preventing replacement of its configuration/TLS directories.
+.PP
+Generic system-command execution and arbitrary unreserved outbound TCP ports
+are not allowed. External executable plugins or other storage paths need
+an explicitly scoped policy. Port labels do not restrict listener addresses;
+configure listeners and the firewall separately.
 
 
 .PP

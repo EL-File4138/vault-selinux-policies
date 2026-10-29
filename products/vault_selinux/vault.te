@@ -1,4 +1,4 @@
-policy_module(vault, 0.1.7)
+policy_module(vault, 0.1.8)
 
 ########################################
 #
@@ -19,7 +19,11 @@ init_daemon_domain(vault_t, vault_exec_t)
 type vault_conf_t;
 files_type(vault_conf_t)
 
-# Mapped to the /opt/vault folder
+# The parent must not be writable: otherwise TLS directories can be replaced.
+type vault_root_t;
+files_type(vault_root_t)
+
+# Mapped only to /opt/vault/data
 type vault_sys_content_t;
 files_type(vault_sys_content_t)
 
@@ -66,7 +70,6 @@ allow vault_t self:unix_stream_socket create_stream_socket_perms;
 allow vault_t self:netlink_route_socket { bind create getattr nlmsg_read };
 allow vault_t self:unix_dgram_socket { bind create getattr setopt connect sendto write };
 allow vault_t self:tcp_socket { accept bind create getattr listen setopt read write };
-allow vault_t unreserved_port_t:tcp_socket name_connect;
 # Allow to write to /dev/log
 allow vault_t kernel_t:unix_dgram_socket sendto;
 # allow outbound network connectivity (for node to node comms)
@@ -124,7 +127,8 @@ init_nnp_daemon_domain(vault_t)
 
 # Need to access conf files
 allow vault_t vault_conf_t:file { getattr open read };
-allow vault_t vault_conf_t:dir search;
+allow vault_t vault_conf_t:dir list_dir_perms;
+allow vault_t vault_root_t:dir list_dir_perms;
 
 ## auth_read_passwd
 ###  Read the passwd passwords file (/etc/passwd)
@@ -133,9 +137,7 @@ allow vault_t vault_conf_t:dir search;
 ###  which is used for dynamic users.
 auth_read_passwd(vault_t)
 
-# Warning: corecmd_exec_ls() has been deprecated, please use corecmd_exec_bin() instead.
-#corecmd_exec_ls(vault_t)
-corecmd_exec_bin(vault_t)
+# External executable plugins need a separate, explicitly scoped policy.
 
 ## kernel_read_sys
 ###  Allows caller to read system state information in /proc.
@@ -145,8 +147,8 @@ kernel_read_system_state(vault_t)
 allow init_t vault_conf_t:file { read open };
 
 # Need to access data files
-allow vault_t vault_sys_content_t:dir { add_name create getattr open read write search remove_name };
-allow vault_t vault_sys_content_t:file { create getattr lock map open read write unlink rename };
+allow vault_t vault_sys_content_t:dir manage_dir_perms;
+allow vault_t vault_sys_content_t:file { manage_file_perms map };
 allow vault_t vault_sys_content_t:lnk_file { create getattr lock map open read write unlink rename };
 
 # Need to access log files

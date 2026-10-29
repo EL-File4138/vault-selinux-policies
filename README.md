@@ -17,10 +17,10 @@ This repo holds the raw SELinux policy files, the packaging scripts _and_ valida
 ### Caveats
 
 * The SELinux policy file contexts, used as part of SELinux labelling, map to where the packaged versions of Vault install their config, data and log files. The Vault packages are available from: https://learn.hashicorp.com/tutorials/vault/getting-started-install
-* The SELinux policies do allow fairly open outbound network traffic, although not outbound HTTP access by default.
+* The adapted policy permits the named Vault API/cluster ports, not arbitrary unreserved outbound ports. External executable plugins require an explicitly scoped policy.
 * The SELinux policies haven't been tested with Vault+Consul, or other storage engines, except for Integrated Storage.
 * The current policy is in Enforced Mode (which will block and audit), but can be edited into Permissive Mode (which will audit only).
-* The packaged installers have only been tested with CentOS7, CentOS8, Fedora 31, Fedora 32 and Fedora 33.
+* Historical installers were tested with CentOS7, CentOS8 and Fedora 31–33. AlmaLinux 10 build/offline-store checks do not establish enforcing runtime compatibility.
 
 ## Getting Started
 
@@ -30,7 +30,7 @@ If you have a customized Vault installation, then you will need to clone this re
 
 ### Booleans
 
-While the current baseline provides fairly open access, there are some features that are gated by SELinux [Booleans](https://wiki.gentoo.org/wiki/SELinux/Tutorials/Using_SELinux_booleans).
+Some features are gated by SELinux [Booleans](https://wiki.gentoo.org/wiki/SELinux/Tutorials/Using_SELinux_booleans).
 
 * `vault_outbound_udp_dns` - if set will allow Vault to query DNS via UDP
 * `vault_outbound_http` - if set will allow Vault to send outbound HTTP requests
@@ -72,6 +72,41 @@ Pushing to the main branch of this repo will execute CircleCI jobs: https://app.
 These jobs will save RPM artifacts in the package steps, one for CentOS, and one for Fedora.
 
 ## Testing locally
+
+### Isolated AlmaLinux 10 packaging checks
+
+Use Mock rather than `vault.sh` or `make local-package` when the host policy
+must remain untouched. Those older helpers install policy on the build host.
+
+```sh
+mock -r almalinux-10-x86_64 --buildsrpm \
+  --spec products/vault_selinux/vault_selinux.spec \
+  --sources products/vault_selinux --resultdir result
+mock -r almalinux-10-x86_64 --rebuild result/vault_selinux-0.1.8-1.el10.src.rpm \
+  --resultdir result
+```
+
+`products/vault_selinux/ci/validate-offline.sh LEGACY_RPM CANDIDATE_RPM`
+must run **inside a disposable Mock root**, with targeted policy,
+policycoreutils-python-utils and setools-console installed. It checks fresh
+installation, reinstallation, upgrade from 0.1.7, removal, conflicting local
+port mappings (including rejected legacy upgrades), expected file contexts and
+selected positive/negative policy rules.
+It refuses an enabled SELinux environment or writable kernel SELinux filesystem.
+
+Mock shares the host kernel; these are offline policy-store checks, not proof
+of a `vault_t` transition, enforcing Vault/Raft operation, TLS reload, or
+snapshot restore. It also does not prove relabeling of existing inodes: the RPM
+relabels existing `/var/log/vault*` paths against effective mappings to retire
+the legacy broad log label, but this needs enforcing-host acceptance checks.
+Do not treat a successful RPM transaction as runtime acceptance.
+
+Writable storage is limited to `/opt/vault/data`; `/opt/vault/tls` is read-only
+configuration and `/opt/vault` is a read-only parent. Other storage paths need
+explicit file-context mappings. The RPM reconciles TCP 8201 after legacy upgrade
+scriptlets; it reports conflicting local mappings instead of replacing them.
+
+### Historical host-installing helper
 
 This has only been tested on CentOS and Fedora, and requires some prerequisites. The AWS steps below offer a more thorough example of how to test this on CentOS and Fedora.
 
